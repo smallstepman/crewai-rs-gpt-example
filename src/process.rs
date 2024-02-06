@@ -1,18 +1,10 @@
-use std::fmt;
+use strum_macros::EnumString;
 
-#[derive(Debug)]
-enum Process {
+#[derive(Debug, EnumString)]
+pub enum Process {
+    #[strum(serialize = "sequential")]
     Sequential,
+    #[strum(serialize = "hierarchical")]
     Hierarchical,
-    // TODO: Consensual,
-}
-
-impl fmt::Display for Process {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Process::Sequential => write!(f, "sequential"),
-            Process::Hierarchical => write!(f, "hierarchical"),
-            // TODO: Process::Consensual => write!(f, "consensual"),
-        }
-    }
+    // TODO: Consensual = "consensual",
 }

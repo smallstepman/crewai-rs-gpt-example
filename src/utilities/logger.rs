@@ -1,24 +1,20 @@
-use std::collections::HashMap;
-
 struct Logger {
-    verbose_level: u32,
+    verbose_level: u8,
 }
 
 impl Logger {
-    fn new(verbose_level: u32) -> Self {
-        let verbose_level = if verbose_level != 0 { verbose_level } else { 2 };
+    fn new(verbose_level: u8) -> Logger {
         Logger { verbose_level }
     }
 
     fn log(&self, level: &str, message: &str) {
-        let level_map: HashMap<&str, u32> = [("debug", 1), ("info", 2)].iter().cloned().collect();
-        if self.verbose_level > 0 && level_map.get(level).unwrap_or(&0) <= &self.verbose_level {
-            println!("[{}]: {}", level.to_uppercase(), message);
+        let level_map = [("debug", 1), ("info", 2)].iter().cloned().collect::<std::collections::HashMap<&str, u8>>();
+        if self.verbose_level > 0 {
+            if let Some(&level_value) = level_map.get(level) {
+                if level_value <= self.verbose_level {
+                    println!("[{}]: {}", level.to_uppercase(), message);
+                }
+            }
         }
     }
-}
-
-fn main() {
-    let logger = Logger::new(0);
-    logger.log("debug", "Debug message");
 }

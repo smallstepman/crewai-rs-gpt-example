@@ -1,96 +1,117 @@
+use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyTuple};
+use std::sync::{Arc, Mutex};
 use std::thread;
-use std::sync::Arc;
-use std::sync::Mutex;
 use uuid::Uuid;
 
-struct Task {
+#[pyclass]
+struct I18N;
+
+#[pyclass]
+struct TaskOutput {
     description: String,
-    callback: Option<Box<dyn Fn(TaskOutput)>>,
+    result: String,
+}
+
+#[pyclass]
+struct Agent {
+    tools: Vec<String>,
+    // Other fields and methods as required
+}
+
+#[pyclass]
+#[derive(Clone)]
+struct Task {
+    #[pyo3(get)]
+    description: String,
+    callback: Option<PyObject>,
     agent: Option<Agent>,
     expected_output: Option<String>,
     context: Option<Vec<Task>>,
-    async_execution: bool,
+    async_execution: Option<bool>,
     output: Option<TaskOutput>,
-    tools: Vec<Box<dyn Any>>,
+    tools: Vec<String>,
     id: Uuid,
 }
 
+#[pymethods]
 impl Task {
-    fn new(description: String) -> Task {
+    #[new]
+    fn new(description: String) -> Self {
         Task {
             description,
             callback: None,
             agent: None,
             expected_output: None,
             context: None,
-            async_execution: false,
+            async_execution: None,
             output: None,
-            tools: Vec::new(),
+            tools: vec![],
             id: Uuid::new_v4(),
         }
     }
 
-    fn execute(
-        &mut self,
-        agent: Option<Agent>,
-        context: Option<String>,
-        tools: Option<Vec<Box<dyn Any>>>,
-    ) -> String {
-        let agent = agent.or(self.agent.clone()).expect("The task has no agent assigned.");
-        
-        let context = if let Some(context_tasks) = &self.context {
-            let mut context_output = Vec::new();
-            for task in context_tasks {
-                if task.async_execution {
-                    task.thread.join().expect("Failed to join thread.");
-                }
-                if let Some(output) = &task.output {
-                    context_output.push(output.result.clone());
-                }
-            }
-            Some(context_output.join("\n"))
-        } else {
-            context
-        };
-        
-        let tools = tools.unwrap_or_else(|| self.tools.clone());
-        
-        if self.async_execution {
-            let task = self.clone();
-            self.thread = Some(thread::spawn(move || {
-                task._execute(agent, task._prompt(), context, tools)
-            }));
-            String::new()
-        } else {
-            self._execute(agent, self._prompt(), context, tools)
+    fn execute(&self, agent: Option<&Agent>, context: Option<&str>, tools: Option<Vec<String>>) -> PyResult<String> {
+        let agent = agent.or(self.agent.as_ref());
+        if agent.is_none() {
+            return Err(PyErr::new::<pyo3::exceptions::PyException, _>(
+                "The task has no agent assigned, therefore it can't be executed directly.",
+            ));
         }
+
+        let agent = agent.unwrap();
+        let context = match &self.context {
+            Some(tasks) => {
+                let mut context_results = vec![];
+                for task in tasks {
+                    if task.async_execution.unwrap_or(false) {
+                        // Join the thread if it's async (not implemented here)
+                    }
+                    if let Some(output) = &task.output {
+                        context_results.push(output.result.clone());
+                    }
+                }
+                Some(context_results.join("\n"))
+            }
+            None => context.map(|s| s.to_string()),
+        };
+
+        let tools = tools.or_else(|| Some(self.tools.clone()));
+
+        if self.async_execution.unwrap_or(false) {
+            // Execute asynchronously (not implemented here)
+        } else {
+            let result = self._execute(agent, &self._prompt(), context.as_deref(), &tools.unwrap());
+            return Ok(result);
+        }
+
+        Ok("".to_string())
     }
-    
-    fn _execute(&mut self, agent: Agent, task_prompt: String, context: Option<String>, tools: Vec<Box<dyn Any>>) -> String {
-        let result = agent.execute_task(task_prompt, context, tools);
-        self.output = Some(TaskOutput {
-            description: self.description.clone(),
-            result: result.clone(),
-        });
+
+    fn _execute(&self, agent: &Agent, task_prompt: &str, context: Option<&str>, tools: &[String]) -> String {
+        // Execute the task using the agent (not implemented here)
+        let result = format!("Executed task with prompt: {}", task_prompt);
         if let Some(callback) = &self.callback {
-            callback(self.output.clone().unwrap());
+            // Invoke the callback with the result (not implemented here)
         }
         result
     }
-    
+
     fn _prompt(&self) -> String {
-        let mut task_slices = vec![self.description.clone()];
-        
+        let mut tasks_slices = vec![self.description.clone()];
+
         if let Some(expected_output) = &self.expected_output {
-            let output = format!("Expected Output: {}", expected_output);
-            task_slices.push(output);
+            // Use I18N to format the expected output (not implemented here)
+            let output = format!("Expected output: {}", expected_output);
+            tasks_slices.push(output);
         }
-        
-        task_slices.join("\n")
+
+        tasks_slices.join("\n")
     }
 }
 
-fn main() {
-    let mut task = Task::new("Task Description".to_string());
-    task.execute(None, None, None);
+#[pymodule]
+fn crewai_task_rust(_py: Python, m: &PyModule) -> PyResult<()> {
+    m.add_class::<Task>()?;
+    Ok(())
 }

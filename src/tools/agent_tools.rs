@@ -1,24 +1,35 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+#[derive(Serialize, Deserialize)]
 struct Agent {
     role: String,
+    // Other fields that define an Agent
 }
 
-impl Agent {
-    fn execute_task(&self, task: &str, context: &str) -> String {
-        // Implement the logic to execute the task
-        String::from("Task executed")
+#[derive(Serialize, Deserialize)]
+struct I18N {
+    // Define the structure for I18N
+}
+
+#[derive(Serialize, Deserialize)]
+struct Tool {
+    name: String,
+    description: String,
+    // Other fields that define a Tool
+}
+
+impl Tool {
+    fn from_function(name: &str, description: &str) -> Self {
+        Tool {
+            name: name.to_string(),
+            description: description.to_string(),
+            // Initialize other fields
+        }
     }
 }
 
-struct I18N {
-    // Implement the I18N struct
-}
-
-struct Tool {
-    // Implement the Tool struct
-}
-
+#[derive(Serialize, Deserialize)]
 struct AgentTools {
     agents: Vec<Agent>,
     i18n: I18N,
@@ -26,104 +37,64 @@ struct AgentTools {
 
 impl AgentTools {
     fn tools(&self) -> Vec<Tool> {
-        let mut tools = Vec::new();
-
-        let delegate_work_tool = Tool::from_function(
-            self.delegate_work,
-            "Delegate work to co-worker",
-            format!(
-                "{}",
-                self.i18n.tools("delegate_work").format(
-                    self.agents
-                        .iter()
-                        .map(|agent| agent.role.clone())
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                )
+        vec![
+            Tool::from_function(
+                "Delegate work to co-worker",
+                &self.i18n.tools("delegate_work", &self.agent_roles()),
             ),
-        );
-        tools.push(delegate_work_tool);
-
-        let ask_question_tool = Tool::from_function(
-            self.ask_question,
-            "Ask question to co-worker",
-            format!(
-                "{}",
-                self.i18n.tools("ask_question").format(
-                    self.agents
-                        .iter()
-                        .map(|agent| agent.role.clone())
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                )
+            Tool::from_function(
+                "Ask question to co-worker",
+                &self.i18n.tools("ask_question", &self.agent_roles()),
             ),
-        );
-        tools.push(ask_question_tool);
-
-        tools
+        ]
     }
 
     fn delegate_work(&self, command: &str) -> String {
-        self._execute(command)
+        self.execute(command)
     }
 
     fn ask_question(&self, command: &str) -> String {
-        self._execute(command)
+        self.execute(command)
     }
 
-    fn _execute(&self, command: &str) -> String {
-        let parts: Vec<&str> = command.split("|").collect();
+    fn execute(&self, command: &str) -> String {
+        let parts: Vec<&str> = command.split('|').collect();
         if parts.len() != 3 {
-            return self.i18n.errors("agent_tool_missing_param").to_string();
+            return self.i18n.errors("agent_tool_missing_param");
         }
 
-        let agent = parts[0];
-        let task = parts[1];
-        let context = parts[2];
-
-        if agent.is_empty() || task.is_empty() || context.is_empty() {
-            return self.i18n.errors("agent_tool_missing_param").to_string();
+        let (agent_role, task, context) = (parts[0], parts[1], parts[2]);
+        if agent_role.is_empty() || task.is_empty() || context.is_empty() {
+            return self.i18n.errors("agent_tool_missing_param");
         }
 
-        let agent = self
-            .agents
-            .iter()
-            .find(|available_agent| available_agent.role == agent);
-
-        if let Some(agent) = agent {
-            agent.execute_task(task, context)
-        } else {
-            self.i18n
-                .errors("agent_tool_unexsiting_coworker")
-                .format(
-                    self.agents
-                        .iter()
-                        .map(|agent| agent.role.clone())
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                )
-                .to_string()
+        let agent = self.agents.iter().find(|a| a.role == agent_role);
+        match agent {
+            Some(agent) => agent.execute_task(task, context),
+            None => self.i18n.errors("agent_tool_unexisting_coworker", &self.agent_roles()),
         }
+    }
+
+    fn agent_roles(&self) -> String {
+        self.agents.iter().map(|agent| &agent.role).collect::<Vec<&String>>().join(", ")
     }
 }
 
-fn main() {
-    let agents = vec![
-        Agent {
-            role: String::from("Agent 1"),
-        },
-        Agent {
-            role: String::from("Agent 2"),
-        },
-    ];
-    let i18n = I18N {
-        // Initialize the I18N struct
-    };
-    let agent_tools = AgentTools { agents, i18n };
+impl I18N {
+    fn tools(&self, key: &str, params: &str) -> String {
+        // Implement the logic to return the internationalized string for tools
+        format!("{}: {}", key, params)
+    }
 
-    let tools = agent_tools.tools();
-    for tool in tools {
-        println!("Name: {}", tool.name);
-        println!("Description: {}", tool.description);
+    fn errors(&self, key: &str, params: &str) -> String {
+        // Implement the logic to return the internationalized string for errors
+        format!("{}: {}", key, params)
+    }
+}
+
+impl Agent {
+    fn execute_task(&self, task: &str, context: &str) -> String {
+        // Implement the logic to execute the task
+        format!("Executing task: {} with context: {}", task, context)
     }
 }
